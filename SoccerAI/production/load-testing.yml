@@ -1,0 +1,90 @@
+config:
+  target: 'http://localhost:3001'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 10
+      name: "Ramp up load"
+    - duration: 300
+      arrivalRate: 20
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 30
+      name: "Peak load"
+    - duration: 120
+      arrivalRate: 5
+      name: "Cool down"
+  defaults:
+    headers:
+      Authorization: 'Bearer dummy-token'
+      Content-Type: 'application/json'
+  processor: "./load-test-processor.js"
+
+scenarios:
+  - name: "API Health Check"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/health"
+          expect:
+            - statusCode: 200
+            - hasProperty: "status"
+
+  - name: "User Authentication"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "password123"
+          expect:
+            - statusCode: 200
+            - hasProperty: "token"
+      - think: 1
+
+  - name: "Get Predictions"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/predictions"
+          qs:
+            page: 1
+            limit: 10
+          expect:
+            - statusCode: 200
+            - hasProperty: "data"
+      - think: 2
+
+  - name: "Create Prediction"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/predictions"
+          json:
+            match_id: 1
+            predicted_outcome: "home_win"
+            confidence_score: 0.75
+          expect:
+            - statusCode: 201
+      - think: 3
+
+  - name: "Dashboard Stats"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/analytics/dashboard"
+          expect:
+            - statusCode: 200
+            - hasProperty: "total_predictions"
+      - think: 1
+
+  - name: "Live Matches"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/matches/live"
+          expect:
+            - statusCode: 200
